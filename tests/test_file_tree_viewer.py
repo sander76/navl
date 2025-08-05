@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from file_tree_viewer import FileTreeViewer, TreeNode
+from navl.file_tree_viewer import FileTreeViewer, TreeNode
 
 
 @pytest.fixture
@@ -38,6 +38,7 @@ def test_collect_expanded_paths_no_expanded_nodes(test_path: Path):
 def test_collect_visible_nodes(test_path: Path):
     """Test the _collect_visible_nodes method."""
     viewer = FileTreeViewer(test_path)
+    viewer._update_display()
 
     assert [node.path for node in viewer.visible_nodes] == [
         test_path,
@@ -47,8 +48,11 @@ def test_collect_visible_nodes(test_path: Path):
 
 def test_collect_visibile_nodes_expanded(test_path: Path):
     viewer = FileTreeViewer(test_path)
+
+    viewer._update_display()
+
     viewer.visible_nodes[1].toggle_expanded()  # expanding the src folder
-    viewer.update_display()
+    viewer._update_display()
 
     assert [node.path for node in viewer.visible_nodes] == [
         test_path,
