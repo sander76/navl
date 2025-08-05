@@ -18,14 +18,12 @@ navl is an interactive file tree viewer that allows you to navigate directory st
 
 or better use `pipx` or `uv tool` and you'll have a navl command available in your prompt.
 
-
-
 ## terminal usage
 
 cd into a folder using navl. Put this bash function inside your `.bashrc` or `.zshrc` file.
 
 ```bash
-# A function to visually change directories with nval
+# A function to visually change directories with navl
 lcd() {
     local selected_dir
     selected_dir=$(navl)
