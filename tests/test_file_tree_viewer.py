@@ -1,5 +1,4 @@
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
 from gitignore_parser import parse_gitignore
