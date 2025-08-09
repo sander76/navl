@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from gitignore_parser import parse_gitignore
 
 from navl.file_tree_viewer import FileTreeViewer, TreeNode
 
@@ -14,9 +15,26 @@ def test_path(tmp_path: Path):
     return tmp_path
 
 
+def test_collect_visibile_nodes_expanded(test_path: Path):
+    viewer = FileTreeViewer(test_path)
+
+    viewer._update_display()
+
+    viewer.visible_nodes[1].toggle_expanded()  # expanding the src folder
+    viewer._update_display()
+
+    assert [node.path for node in viewer.visible_nodes] == [
+        test_path,
+        test_path / "src",
+        test_path / "src" / "docs",
+        test_path / "src" / "main.py",
+        test_path / "src" / "my_lib",
+    ]
+
+
 def test_collect_expanded_paths(test_path: Path):
     """Test the _collect_expanded_paths method."""
-    root_node = TreeNode(test_path / "src")
+    root_node = TreeNode(test_path / "src", gitignore_parser=None, parent=None)
     root_node.load_children()
     root_node.children[0].expanded = True  # expanding one path here.
 
@@ -27,7 +45,7 @@ def test_collect_expanded_paths(test_path: Path):
 
 def test_collect_expanded_paths_no_expanded_nodes(test_path: Path):
     """Test _collect_expanded_paths when no nodes are expanded."""
-    root_node = TreeNode(test_path / "src")
+    root_node = TreeNode(test_path / "src", gitignore_parser=None, parent=None)
     root_node.load_children()
 
     expanded = tuple(FileTreeViewer._collect_expanded_paths(root_node))
@@ -46,18 +64,40 @@ def test_collect_visible_nodes(test_path: Path):
     ]
 
 
-def test_collect_visibile_nodes_expanded(test_path: Path):
-    viewer = FileTreeViewer(test_path)
+def test_gitignore_same_level(test_path: Path):
+    # file to ignore is on the same level as the gitignore file.
 
-    viewer._update_display()
+    git_ignore_file = test_path / "src" / ".gitignore"
+    git_ignore_file.write_text("**/main.py")
 
-    viewer.visible_nodes[1].toggle_expanded()  # expanding the src folder
-    viewer._update_display()
-
-    assert [node.path for node in viewer.visible_nodes] == [
-        test_path,
+    node = TreeNode(
         test_path / "src",
+        gitignore_parser=parse_gitignore(git_ignore_file),
+        parent=None,
+    )
+    node.load_children()
+
+    assert set([child.path for child in node.children]) == {
+        test_path / "src" / ".gitignore",
         test_path / "src" / "docs",
-        test_path / "src" / "main.py",
         test_path / "src" / "my_lib",
-    ]
+    }
+
+
+def test_gitignore_higher_level(test_path: Path):
+    # file to ignore is on a level lower than the gitignore file.
+
+    git_ignore_file = test_path / ".gitignore"
+    git_ignore_file.write_text("**/main.py")
+
+    node = TreeNode(
+        test_path / "src",
+        gitignore_parser=parse_gitignore(git_ignore_file),
+        parent=None,
+    )
+    node.load_children()
+
+    assert set([child.path for child in node.children]) == {
+        test_path / "src" / "docs",
+        test_path / "src" / "my_lib",
+    }

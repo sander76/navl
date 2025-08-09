@@ -5,8 +5,9 @@ Navigate with arrow keys, expand/collapse with Enter or Space.
 """
 
 from pathlib import Path
-from typing import Generator, Iterable, List, Optional, Tuple
+from typing import Callable, Generator, Iterable, List, Optional, Tuple
 
+from gitignore_parser import parse_gitignore
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.key_binding import KeyBindings
@@ -19,9 +20,15 @@ class TreeNode:
     """Represents a node in the file tree."""
 
     def __init__(
-        self, path: Path, parent: Optional["TreeNode"] = None, expanded: bool = False
+        self,
+        path: Path,
+        *,
+        gitignore_parser: Callable[[Path], bool] | None,
+        parent: Optional["TreeNode"],
+        expanded: bool = False,
     ):
         self.path = path
+        self.gitignore_parser = gitignore_parser
         self.parent = parent
         self.children: List["TreeNode"] = []
         self.expanded = expanded
@@ -36,13 +43,16 @@ class TreeNode:
         if not self.is_directory or self.children:
             return
 
-        try:
-            for item in sorted(self.path.iterdir()):
-                if not item.name.startswith("."):  # Skip hidden files
-                    child = TreeNode(item, self)
-                    self.children.append(child)
-        except PermissionError:
-            pass  # Skip directories we can't read
+        children = self.path.iterdir()
+        if self.gitignore_parser:
+            children = (child for child in children if not self.gitignore_parser(child))
+
+        self.children = tuple(
+            (
+                TreeNode(child, gitignore_parser=self.gitignore_parser, parent=self)
+                for child in sorted(children)
+            )
+        )
 
     def toggle_expanded(self):
         """Toggle the expanded state of this node."""
@@ -78,7 +88,7 @@ class FileTreeViewer:
             key_bindings=self._setup_key_bindings(),
             get_cursor_position=self._get_cursor_position,
         )
-
+        parse_gitignore
         self._window = Window(content=text_control, wrap_lines=False)
 
     def _get_cursor_position(self) -> Point:
@@ -97,7 +107,17 @@ class FileTreeViewer:
         self._selected_index = idx
 
     def _init_root_node(self) -> TreeNode:
-        root_node = TreeNode(self.root_path, expanded=True)
+        gitignore_file = self.root_path / ".gitignore"
+        gitignore_parser = (
+            parse_gitignore(gitignore_file) if gitignore_file.exists() else None
+        )
+
+        root_node = TreeNode(
+            self.root_path,
+            gitignore_parser=gitignore_parser,
+            expanded=True,
+            parent=None,
+        )
         root_node.load_children()
         return root_node
 
